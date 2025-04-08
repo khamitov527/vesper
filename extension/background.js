@@ -5,6 +5,8 @@
 
 // Import OpenAI module
 import { formatTranscriptionText, extractContactInfo, saveAPIKey } from './scripts/openAI.js';
+// Import People API module
+import { fetchContacts, getStoredContacts, initPeopleAPI } from './scripts/peopleAPI.js';
 
 // Load environment variables from .env
 const loadEnvVariables = async () => {
@@ -55,6 +57,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Load environment variables
   const envVars = await loadEnvVariables();
   console.log('[Background] Environment variables loaded on install');
+  
+  // Initialize the People API
+  const peopleAPIInit = await initPeopleAPI();
+  console.log('[Background] People API initialization result:', peopleAPIInit);
 });
 
 // OAuth functions
@@ -79,9 +85,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     
     case 'FETCH_CONTACTS':
-      // TODO: Implement contact fetching logic
-      sendResponse({ status: 'fetching_contacts' });
-      break;
+      console.log('[Background] Processing FETCH_CONTACTS message');
+      (async () => {
+        try {
+          // Try to fetch fresh contacts from the API
+          const contacts = await fetchContacts();
+          sendResponse({ 
+            status: 'success', 
+            contacts: contacts,
+            message: `Successfully fetched ${contacts.length} contacts` 
+          });
+        } catch (error) {
+          console.error('[Background] Error fetching contacts:', error);
+          
+          // If API fetch fails, try to get stored contacts as fallback
+          try {
+            const storedContacts = await getStoredContacts();
+            if (storedContacts && storedContacts.length > 0) {
+              sendResponse({ 
+                status: 'success_from_cache', 
+                contacts: storedContacts,
+                message: `Retrieved ${storedContacts.length} contacts from cache` 
+              });
+            } else {
+              sendResponse({ 
+                status: 'error', 
+                error: error.message,
+                message: 'Failed to fetch contacts and no cached contacts available'
+              });
+            }
+          } catch (storageError) {
+            sendResponse({ 
+              status: 'error', 
+              error: error.message,
+              storageError: storageError.message,
+              message: 'Failed to fetch contacts and retrieve from cache'
+            });
+          }
+        }
+      })();
+      return true; // Required to use the sendResponse asynchronously
       
     case 'SET_OPENAI_API_KEY':
       console.log('[Background] Setting OpenAI API key manually');

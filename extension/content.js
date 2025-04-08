@@ -121,6 +121,25 @@ const stopVoiceRecognition = () => {
   return false;
 };
 
+// Fetch contacts from Google People API
+const fetchEmailContacts = () => {
+  console.log('[Content] Requesting contacts from background script');
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: 'FETCH_CONTACTS' }, response => {
+      if (chrome.runtime.lastError) {
+        console.error('[Content] Error sending FETCH_CONTACTS message:', chrome.runtime.lastError);
+        reject(chrome.runtime.lastError);
+      } else if (response && (response.status === 'success' || response.status === 'success_from_cache')) {
+        console.log(`[Content] Contacts fetched: ${response.contacts?.length || 0}`);
+        resolve(response.contacts || []);
+      } else {
+        console.error('[Content] Failed to fetch contacts:', response?.error || 'Unknown error');
+        reject(new Error(response?.error || 'Failed to fetch contacts'));
+      }
+    });
+  });
+};
+
 // Set up message listeners for communication with popup and background script
 const setupMessageListeners = () => {
   // console.log('[Content] Setting up message listeners');
@@ -138,6 +157,26 @@ const setupMessageListeners = () => {
         }
         sendResponse({ status: 'recipient_filled' });
         break;
+        
+      case 'FETCH_EMAIL_CONTACTS':
+        console.log('[Content] Processing FETCH_EMAIL_CONTACTS message');
+        // Fetch contacts and respond with result
+        fetchEmailContacts()
+          .then(contacts => {
+            sendResponse({ 
+              status: 'success', 
+              contacts: contacts,
+              message: `Successfully fetched ${contacts.length} contacts` 
+            });
+          })
+          .catch(error => {
+            sendResponse({ 
+              status: 'error', 
+              error: error.message,
+              message: 'Failed to fetch contacts' 
+            });
+          });
+        return true; // Required for async sendResponse
         
       case 'START_VOICE_RECOGNITION':
         // console.log('[Content] Processing START_VOICE_RECOGNITION message');
@@ -194,6 +233,7 @@ if (typeof module !== 'undefined') {
     initVesper,
     activateVoiceControl,
     startVoiceRecognition,
-    stopVoiceRecognition
+    stopVoiceRecognition,
+    fetchEmailContacts
   };
 } 

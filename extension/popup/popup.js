@@ -15,6 +15,7 @@ const initializePopup = () => {
   const confirmButton = document.getElementById('confirm-button');
   const cancelButton = document.getElementById('cancel-button');
   const debugResetButton = document.getElementById('debug-reset');
+  const fetchContactsButton = document.getElementById('fetch-contacts');
   const statusIndicator = document.getElementById('status-indicator');
   const transcriptionText = document.getElementById('transcription-text');
   
@@ -25,6 +26,7 @@ const initializePopup = () => {
   confirmButton.addEventListener('click', handleConfirmSelection);
   cancelButton.addEventListener('click', handleCancelSelection);
   debugResetButton.addEventListener('click', handleDebugReset);
+  fetchContactsButton.addEventListener('click', handleFetchContacts);
   
   // Add listener for popup closing
   window.addEventListener('beforeunload', stopVoiceRecognition);
@@ -181,12 +183,27 @@ const displayContacts = (contacts) => {
   contacts.forEach(contact => {
     const contactElement = document.createElement('div');
     contactElement.className = 'contact-item';
-    contactElement.dataset.name = contact.name || '';
-    contactElement.dataset.organization = contact.organization || '';
+    
+    // Handle both the old format and the People API format
+    const name = contact.name || 'Unknown';
+    const organization = contact.organization || '';
+    
+    // For People API format with emails array
+    let primaryEmail = '';
+    if (contact.emails && contact.emails.length > 0) {
+      // Try to find the primary email first
+      const primary = contact.emails.find(email => email.primary);
+      primaryEmail = primary ? primary.email : contact.emails[0].email;
+    }
+    
+    contactElement.dataset.name = name;
+    contactElement.dataset.organization = organization;
+    contactElement.dataset.email = primaryEmail;
     
     contactElement.innerHTML = `
-      <div class="contact-name">${contact.name || 'Unknown'}</div>
-      ${contact.organization ? `<div class="contact-org">${contact.organization}</div>` : ''}
+      <div class="contact-name">${name}</div>
+      ${organization ? `<div class="contact-org">${organization}</div>` : ''}
+      ${primaryEmail ? `<div class="contact-email">${primaryEmail}</div>` : ''}
     `;
     
     contactElement.addEventListener('click', () => {
@@ -391,4 +408,29 @@ const handleDebugReset = () => {
   updateStatus('ready');
   
   console.log('[Popup] Debug reset completed');
+};
+
+// Handle fetch contacts button click
+const handleFetchContacts = () => {
+  console.log('[Popup] Fetch contacts button clicked');
+  updateStatus('processing');
+  
+  // Show loading indicator
+  const contactsContainer = document.getElementById('contacts-container');
+  contactsContainer.innerHTML = '<p class="loading-state">Fetching contacts...</p>';
+  
+  // Send message to fetch contacts
+  chrome.runtime.sendMessage({ type: 'FETCH_CONTACTS' }, (response) => {
+    console.log('[Popup] Response to fetch contacts:', response);
+    
+    if (response && (response.status === 'success' || response.status === 'success_from_cache')) {
+      // Display the contacts in the UI
+      displayContacts(response.contacts);
+      updateStatus('ready');
+    } else {
+      // Display error
+      contactsContainer.innerHTML = `<p class="error-state">Error fetching contacts: ${response?.error || 'Unknown error'}</p>`;
+      updateStatus('ready');
+    }
+  });
 }; 
