@@ -117,6 +117,33 @@ h1 {
   background-color: #f8f9fa;
 }
 
+.recipient-info {
+  margin-bottom: 16px;
+}
+
+.recipient-info h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--text-color);
+}
+
+.recipient-container {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.recipient-item {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background-color: #f8f9fa;
+}
+
+.recipient-name, .recipient-org, .recipient-nickname, .recipient-title {
+  margin-bottom: 4px;
+}
+
 .contact-results {
   margin-bottom: 16px;
 }
@@ -264,4 +291,10 @@ h1 {
   background-color: #666;
   color: white;
   font-size: 12px;
+}
+
+.debug-highlight {
+  border: 2px dashed #ff6b6b !important;
+  background-color: #fff3f3 !important;
+  padding: 8px !important;
 } 

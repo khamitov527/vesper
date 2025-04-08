@@ -130,7 +130,12 @@ const setupMessageListeners = () => {
     switch (message.type) {
       case 'FILL_RECIPIENT':
         console.log('[Content] Processing FILL_RECIPIENT message');
-        // TODO: Fill recipient in Gmail compose window
+        // Fill recipient in Gmail compose window
+        if (message.contacts && message.contacts.length > 0) {
+          console.log('[Content] Filling contacts:', message.contacts);
+          // Here you would add code to actually fill the recipient field in Gmail
+          // For example: document.querySelector('.compose-recipient').value = message.contacts[0].name;
+        }
         sendResponse({ status: 'recipient_filled' });
         break;
         
@@ -153,8 +158,15 @@ const setupMessageListeners = () => {
         // Only forward final results to popup
         if (message.isFinal) {
           console.log('[Content] Forwarding final result to popup');
-          // Forward to popup
-          chrome.runtime.sendMessage(message, response => {
+          // Forward to popup including recipient info if available
+          chrome.runtime.sendMessage({
+            type: 'FORMATTED_TRANSCRIPTION',
+            originalText: message.originalText,
+            formattedText: message.formattedText,
+            recipient: message.recipient,
+            isFinal: message.isFinal,
+            error: message.error
+          }, response => {
             console.log('[Content] Popup response to forwarded formatted text:', response);
             sendResponse(response);
           });

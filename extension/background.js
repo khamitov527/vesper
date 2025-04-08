@@ -163,6 +163,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             try {
               const result = await formatTranscriptionText(originalText);
               console.log('[Background] OpenAI formatting result:', result);
+              console.log('[Background] Detailed result structure:', JSON.stringify(result));
+              console.log('[Background] Recipient data:', result.recipient);
+              
+              // Handle the case where result.data contains the actual data
+              const formattedData = result.data || result;
+              const formattedText = formattedData.formattedText || originalText;
+              const recipientData = formattedData.recipient || { name: null, organization: null, nickname: null, title: null };
               
               // Send formatted result to popup
               console.log('[Background] Sending formatted result to popup');
@@ -171,7 +178,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 chrome.runtime.sendMessage({
                   type: 'FORMATTED_TRANSCRIPTION',
                   originalText: originalText,
-                  formattedText: result.formattedText,
+                  formattedText: formattedText,
+                  recipient: recipientData,
                   isFinal: message.isFinal,
                   error: result.error
                 }, response => {
@@ -186,7 +194,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     chrome.tabs.sendMessage(tab.id, {
                       type: 'FORMATTED_TRANSCRIPTION',
                       originalText: originalText,
-                      formattedText: result.formattedText,
+                      formattedText: formattedText,
+                      recipient: recipientData,
                       isFinal: message.isFinal,
                       error: result.error
                     }).catch(err => {
@@ -214,6 +223,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 type: 'FORMATTED_TRANSCRIPTION',
                 originalText: originalText,
                 formattedText: originalText,
+                recipient: { name: null, organization: null, nickname: null, title: null },
                 isFinal: message.isFinal,
                 error: error.message
               });
@@ -234,12 +244,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         try {
           const result = await extractContactInfo(message.transcript);
+          console.log('[Background] Contact extraction result:', result);
           
           // Forward extracted data to popup
-          if (!result.error && result.data) {
+          if (!result.error) {
+            // Handle the case where result.data contains the actual data
+            const contactData = result.data || result;
+            
             chrome.runtime.sendMessage({
               type: 'CONTACTS_RESULT',
-              contacts: [result.data] // Wrap in array for consistency with UI
+              contacts: [contactData] // Wrap in array for consistency with UI
             });
           } else {
             console.error('Contact extraction failed:', result.error);
