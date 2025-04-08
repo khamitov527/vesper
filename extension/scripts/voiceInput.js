@@ -43,17 +43,12 @@ const handleRecognitionResult = (event) => {
     .map(result => result[0].transcript)
     .join('');
   
-  // Send intermediate results for display
+  // Send transcript to background script for formatting and processing
   chrome.runtime.sendMessage({
     type: 'TRANSCRIPTION_RESULT',
     text: transcript,
     isFinal: event.results[0].isFinal
   });
-  
-  // If final result, process it
-  if (event.results[0].isFinal) {
-    processTranscription(transcript);
-  }
 };
 
 // Handle recognition errors
@@ -75,14 +70,8 @@ const handleRecognitionEnd = () => {
 
 // Process final transcription
 const processTranscription = (transcript) => {
-  // TODO: Further processing or extraction from transcript
-  console.log('Processing transcript:', transcript);
-  
-  // Send to OpenAI for extraction
-  chrome.runtime.sendMessage({
-    type: 'EXTRACT_CONTACT_INFO',
-    transcript: transcript
-  });
+  // Processing is now done in the background script
+  console.log('Transcription completed, will be processed by background script');
 };
 
 // Start voice recognition

@@ -45,7 +45,7 @@ const setupSpeechRecognition = () => {
   // Set up event handlers
   recognition.onstart = () => {
     isListening = true;
-    console.log('Voice recognition started');
+    console.log('[Content] Voice recognition started');
   };
   
   recognition.onresult = (event) => {
@@ -53,16 +53,20 @@ const setupSpeechRecognition = () => {
       .map(result => result[0].transcript)
       .join('');
     
-    // Send current transcript to popup
+    console.log('[Content] Recognition result:', transcript, 'isFinal:', event.results[0].isFinal);
+    
+    // Send current transcript to background script for processing
     chrome.runtime.sendMessage({
       type: 'TRANSCRIPTION_RESULT',
       text: transcript,
       isFinal: event.results[0].isFinal
+    }, response => {
+      console.log('[Content] Background response to transcription:', response);
     });
   };
   
   recognition.onerror = (event) => {
-    console.error('Recognition error:', event.error);
+    console.error('[Content] Recognition error:', event.error);
     isListening = false;
     
     chrome.runtime.sendMessage({
@@ -73,7 +77,7 @@ const setupSpeechRecognition = () => {
   
   recognition.onend = () => {
     isListening = false;
-    console.log('Voice recognition ended');
+    console.log('[Content] Voice recognition ended');
   };
   
   return true;
@@ -81,20 +85,26 @@ const setupSpeechRecognition = () => {
 
 // Start voice recognition
 const startVoiceRecognition = () => {
+  console.log('[Content] Attempting to start voice recognition');
   if (!recognition) {
+    console.log('[Content] Recognition not set up, initializing');
     if (!setupSpeechRecognition()) {
+      console.error('[Content] Failed to set up speech recognition');
       return false;
     }
   }
   
   if (!isListening) {
     try {
+      console.log('[Content] Starting recognition');
       recognition.start();
       return true;
     } catch (error) {
-      console.error('Error starting recognition:', error);
+      console.error('[Content] Error starting recognition:', error);
       return false;
     }
+  } else {
+    console.log('[Content] Already listening, ignoring start request');
   }
   
   return false;
@@ -102,6 +112,7 @@ const startVoiceRecognition = () => {
 
 // Stop voice recognition
 const stopVoiceRecognition = () => {
+  console.log('[Content] Attempting to stop voice recognition, isListening:', isListening);
   if (recognition && isListening) {
     recognition.stop();
     return true;
@@ -112,26 +123,49 @@ const stopVoiceRecognition = () => {
 
 // Set up message listeners for communication with popup and background script
 const setupMessageListeners = () => {
+  console.log('[Content] Setting up message listeners');
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Content script received message:', message.type);
+    console.log('[Content] Received message:', message.type, message, 'from sender:', sender);
     
     switch (message.type) {
       case 'FILL_RECIPIENT':
+        console.log('[Content] Processing FILL_RECIPIENT message');
         // TODO: Fill recipient in Gmail compose window
         sendResponse({ status: 'recipient_filled' });
         break;
         
       case 'START_VOICE_RECOGNITION':
+        console.log('[Content] Processing START_VOICE_RECOGNITION message');
         const started = startVoiceRecognition();
+        console.log('[Content] Recognition started:', started);
         sendResponse({ status: started ? 'recognition_started' : 'recognition_failed' });
         break;
         
       case 'STOP_VOICE_RECOGNITION':
+        console.log('[Content] Processing STOP_VOICE_RECOGNITION message');
         const stopped = stopVoiceRecognition();
+        console.log('[Content] Recognition stopped:', stopped);
         sendResponse({ status: stopped ? 'recognition_stopped' : 'recognition_not_running' });
         break;
         
+      case 'FORMATTED_TRANSCRIPTION':
+        console.log('[Content] Received FORMATTED_TRANSCRIPTION message, isFinal:', message.isFinal);
+        // Only forward final results to popup
+        if (message.isFinal) {
+          console.log('[Content] Forwarding final result to popup');
+          // Forward to popup
+          chrome.runtime.sendMessage(message, response => {
+            console.log('[Content] Popup response to forwarded formatted text:', response);
+            sendResponse(response);
+          });
+        } else {
+          console.log('[Content] Ignoring interim result');
+          sendResponse({ status: 'interim_ignored' });
+        }
+        break;
+        
       default:
+        console.log('[Content] Unknown message type:', message.type);
         sendResponse({ status: 'unknown_command' });
     }
     

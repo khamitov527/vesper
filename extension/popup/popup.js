@@ -9,11 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize popup event listeners and state
 const initializePopup = () => {
+  console.log('[Popup] Initializing popup');
+  
   const startVoiceButton = document.getElementById('start-voice');
   const confirmButton = document.getElementById('confirm-button');
   const cancelButton = document.getElementById('cancel-button');
   const statusIndicator = document.getElementById('status-indicator');
   const transcriptionText = document.getElementById('transcription-text');
+  
+  console.log('[Popup] Setting up event listeners');
   
   // Setup event listeners
   startVoiceButton.addEventListener('click', handleVoiceStart);
@@ -25,10 +29,13 @@ const initializePopup = () => {
   
   // Check auth status
   checkAuthStatus();
+  
+  console.log('[Popup] Popup initialized');
 };
 
 // Handle voice input start
 const handleVoiceStart = () => {
+  console.log('[Popup] Voice start button clicked');
   updateStatus('listening');
   
   // Clear previous transcript
@@ -40,14 +47,16 @@ const handleVoiceStart = () => {
   startVoiceButton.removeEventListener('click', handleVoiceStart);
   startVoiceButton.addEventListener('click', handleVoiceStop);
   
-  // TODO: Communicate with voiceInput.js to start recognition
+  console.log('[Popup] Sending START_VOICE_RECOGNITION message');
+  // Send message to start recognition
   chrome.runtime.sendMessage({ type: 'START_VOICE_RECOGNITION' }, (response) => {
-    console.log('Voice recognition started:', response);
+    console.log('[Popup] Response to start voice recognition:', response);
   });
 };
 
 // Handle voice input stop
 const handleVoiceStop = () => {
+  console.log('[Popup] Voice stop button clicked');
   updateStatus('ready');
   
   // Change button back to start listening
@@ -62,8 +71,9 @@ const handleVoiceStop = () => {
 
 // Stop voice recognition
 const stopVoiceRecognition = () => {
+  console.log('[Popup] Stopping voice recognition');
   chrome.runtime.sendMessage({ type: 'STOP_VOICE_RECOGNITION' }, (response) => {
-    console.log('Voice recognition stopped:', response);
+    console.log('[Popup] Response to stop voice recognition:', response);
   });
 };
 
@@ -90,76 +100,81 @@ const updateStatus = (status) => {
 
 // Update transcription display
 const updateTranscription = (text) => {
+  console.log('[Popup] Updating transcription display with text:', text);
   document.getElementById('transcription-text').textContent = text;
-};
-
-// Display contact results
-const displayContacts = (contacts) => {
-  const contactsContainer = document.getElementById('contacts-container');
-  
-  if (!contacts || contacts.length === 0) {
-    contactsContainer.innerHTML = '<p class="empty-state">No contacts found</p>';
-    return;
-  }
-  
-  let contactsHTML = '';
-  contacts.forEach((contact, index) => {
-    contactsHTML += `
-      <div class="contact-item" data-id="${index}">
-        <div class="contact-name">${contact.name}</div>
-        <div class="contact-email">${contact.email}</div>
-        <div class="contact-org">${contact.organization || ''}</div>
-      </div>
-    `;
-  });
-  
-  contactsContainer.innerHTML = contactsHTML;
-  
-  // Add click event to select contacts
-  document.querySelectorAll('.contact-item').forEach(item => {
-    item.addEventListener('click', (e) => selectContact(e.currentTarget));
-  });
-  
-  // Enable confirm button
-  document.getElementById('confirm-button').disabled = false;
-};
-
-// Select a contact
-const selectContact = (contactElement) => {
-  // Remove selection from all contacts
-  document.querySelectorAll('.contact-item').forEach(item => {
-    item.classList.remove('selected');
-  });
-  
-  // Add selection to clicked contact
-  contactElement.classList.add('selected');
 };
 
 // Handle confirm button click
 const handleConfirmSelection = () => {
-  const selectedContact = document.querySelector('.contact-item.selected');
+  const selectedContacts = document.querySelectorAll('.contact-item.selected');
   
-  if (!selectedContact) {
-    console.log('No contact selected');
+  if (selectedContacts.length === 0) {
+    console.log('No contacts selected');
     return;
   }
   
-  const contactId = selectedContact.dataset.id;
-  
-  // TODO: Send selected contact to Gmail page via content script
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { 
-      type: 'FILL_RECIPIENT', 
-      contactId: contactId 
-    });
+  // Extract selected contact data
+  const contactData = Array.from(selectedContacts).map(item => {
+    return {
+      name: item.dataset.name,
+      organization: item.dataset.organization
+    };
   });
   
-  window.close();
+  // TODO: Pass selected contacts to Gmail 
+  console.log('Selected contacts:', contactData);
+  
+  chrome.runtime.sendMessage({
+    type: 'FILL_RECIPIENT',
+    contacts: contactData
+  }, (response) => {
+    console.log('Recipients filled:', response);
+    // Close popup or provide feedback
+  });
 };
 
 // Handle cancel button click
 const handleCancelSelection = () => {
-  window.close();
+  // Clear UI state
+  updateTranscription('');
+  displayContacts([]);
+  updateStatus('ready');
+};
+
+// Display contacts in UI
+const displayContacts = (contacts) => {
+  const container = document.getElementById('contacts-container');
+  container.innerHTML = '';
+  
+  if (!contacts || contacts.length === 0) {
+    container.innerHTML = '<p class="empty-state">No contacts found</p>';
+    return;
+  }
+  
+  const confirmButton = document.getElementById('confirm-button');
+  confirmButton.disabled = true;
+  
+  contacts.forEach(contact => {
+    const contactElement = document.createElement('div');
+    contactElement.className = 'contact-item';
+    contactElement.dataset.name = contact.name || '';
+    contactElement.dataset.organization = contact.organization || '';
+    
+    contactElement.innerHTML = `
+      <div class="contact-name">${contact.name || 'Unknown'}</div>
+      ${contact.organization ? `<div class="contact-org">${contact.organization}</div>` : ''}
+    `;
+    
+    contactElement.addEventListener('click', () => {
+      contactElement.classList.toggle('selected');
+      
+      // Enable confirm button if at least one contact is selected
+      const hasSelection = document.querySelector('.contact-item.selected') !== null;
+      confirmButton.disabled = !hasSelection;
+    });
+    
+    container.appendChild(contactElement);
+  });
 };
 
 // Check if user is authenticated
@@ -167,28 +182,45 @@ const checkAuthStatus = () => {
   chrome.runtime.sendMessage({ type: 'CHECK_AUTH' }, (response) => {
     if (!response || !response.authenticated) {
       // TODO: Handle not authenticated state
-      console.log('User not authenticated');
+      console.log('[Popup] User not authenticated');
+    } else {
+      console.log('[Popup] User is authenticated');
     }
   });
 };
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Popup received message:', message.type);
+  console.log('[Popup] Received message type:', message.type, message);
   
   switch (message.type) {
     case 'TRANSCRIPTION_RESULT':
-      updateTranscription(message.text);
+      // We're no longer showing real-time transcription
+      // Wait for FORMATTED_TRANSCRIPTION instead
+      console.log('[Popup] Ignoring TRANSCRIPTION_RESULT message, waiting for formatted version');
+      sendResponse({ status: 'awaiting_formatted_text' });
+      break;
+      
+    case 'FORMATTED_TRANSCRIPTION':
+      // Use the formatted text in the UI, falling back to original if there was an error
+      console.log('[Popup] Handling FORMATTED_TRANSCRIPTION message');
+      const textToDisplay = message.error ? message.originalText : message.formattedText;
+      console.log('[Popup] Text to display:', textToDisplay, 'Error:', message.error);
+      updateTranscription(textToDisplay);
       updateStatus('processing');
+      sendResponse({ status: 'formatted_transcription_displayed' });
       break;
       
     case 'CONTACTS_RESULT':
+      console.log('[Popup] Handling CONTACTS_RESULT message:', message.contacts);
       displayContacts(message.contacts);
       updateStatus('ready');
+      sendResponse({ status: 'contacts_displayed' });
       break;
       
     default:
-      console.log('Unknown message type:', message.type);
+      console.log('[Popup] Unknown message type:', message.type);
+      sendResponse({ status: 'unknown_message_type' });
   }
   
   return true; // Indicates async response

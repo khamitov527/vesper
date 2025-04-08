@@ -205,4 +205,63 @@ h1 {
   background-color: var(--border-color);
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.api-key-settings {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.input-group {
+  margin-bottom: 8px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.status-message {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.status-message.success {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.status-message.error {
+  background-color: var(--error-color);
+  color: white;
+}
+
+.status-message.info {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.action-button.debug {
+  background-color: #666;
+  color: white;
+  font-size: 12px;
 } 
