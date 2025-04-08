@@ -98,6 +98,10 @@ const startVoiceRecognition = () => {
     try {
       // console.log('[Content] Starting recognition');
       recognition.start();
+      
+      // Log emails from storage when starting to listen
+      logStoredContacts();
+      
       return true;
     } catch (error) {
       console.error('[Content] Error starting recognition:', error);
@@ -108,6 +112,37 @@ const startVoiceRecognition = () => {
   }
   
   return false;
+};
+
+// Log stored contacts whenever listening starts
+const logStoredContacts = () => {
+  console.log('[Content] Logging contacts from storage');
+  chrome.storage.local.get('vesperContacts', (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Content] Error retrieving contacts:', chrome.runtime.lastError);
+      return;
+    }
+    
+    const contacts = result.vesperContacts || [];
+    console.log(`[Content] Found ${contacts.length} contacts in storage`);
+    
+    // Extract and log email addresses
+    const emails = [];
+    contacts.forEach(contact => {
+      if (contact.emails && contact.emails.length > 0) {
+        contact.emails.forEach(emailObj => {
+          emails.push({
+            name: contact.name || 'Unknown',
+            email: emailObj.email,
+            primary: emailObj.primary || false
+          });
+        });
+      }
+    });
+    
+    console.log(`[Content] Total email addresses: ${emails.length}`);
+    console.table(emails);
+  });
 };
 
 // Stop voice recognition

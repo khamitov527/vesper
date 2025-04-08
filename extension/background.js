@@ -61,7 +61,46 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Initialize the People API
   const peopleAPIInit = await initPeopleAPI();
   console.log('[Background] People API initialization result:', peopleAPIInit);
+  
+  // Log stored contacts
+  logStoredContacts();
 });
+
+// Log stored contacts
+const logStoredContacts = () => {
+  console.log('[Background] Logging contacts from storage');
+  chrome.storage.local.get('vesperContacts', (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Background] Error retrieving contacts:', chrome.runtime.lastError);
+      return;
+    }
+    
+    const contacts = result.vesperContacts || [];
+    console.log(`[Background] Found ${contacts.length} contacts in storage`);
+    
+    if (contacts.length === 0) {
+      console.log('[Background] No contacts found in storage yet.');
+      return;
+    }
+    
+    // Extract and log email addresses
+    const emails = [];
+    contacts.forEach(contact => {
+      if (contact.emails && contact.emails.length > 0) {
+        contact.emails.forEach(emailObj => {
+          emails.push({
+            name: contact.name || 'Unknown',
+            email: emailObj.email,
+            primary: emailObj.primary || false
+          });
+        });
+      }
+    });
+    
+    console.log(`[Background] Total email addresses: ${emails.length}`);
+    console.table(emails);
+  });
+};
 
 // OAuth functions
 const initiateAuthFlow = () => {

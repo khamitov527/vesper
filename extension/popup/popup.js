@@ -51,6 +51,9 @@ const handleVoiceStart = () => {
   startVoiceButton.removeEventListener('click', handleVoiceStart);
   startVoiceButton.addEventListener('click', handleVoiceStop);
   
+  // Log stored contacts 
+  logStoredContacts();
+  
   console.log('[Popup] Sending START_VOICE_RECOGNITION message');
   // Send message to start recognition
   chrome.runtime.sendMessage({ type: 'START_VOICE_RECOGNITION' }, (response) => {
@@ -180,6 +183,15 @@ const displayContacts = (contacts) => {
   const confirmButton = document.getElementById('confirm-button');
   confirmButton.disabled = true;
   
+  // Add contact stats
+  const regularContacts = contacts.filter(c => c.source === 'regular contacts').length;
+  const otherContacts = contacts.filter(c => c.source === 'other contacts').length;
+  
+  const statsElement = document.createElement('div');
+  statsElement.className = 'contacts-stats';
+  statsElement.innerHTML = `<p>Found ${contacts.length} contacts (${regularContacts} regular, ${otherContacts} other contacts)</p>`;
+  container.appendChild(statsElement);
+  
   contacts.forEach(contact => {
     const contactElement = document.createElement('div');
     contactElement.className = 'contact-item';
@@ -187,6 +199,7 @@ const displayContacts = (contacts) => {
     // Handle both the old format and the People API format
     const name = contact.name || 'Unknown';
     const organization = contact.organization || '';
+    const source = contact.source || 'unknown';
     
     // For People API format with emails array
     let primaryEmail = '';
@@ -199,11 +212,18 @@ const displayContacts = (contacts) => {
     contactElement.dataset.name = name;
     contactElement.dataset.organization = organization;
     contactElement.dataset.email = primaryEmail;
+    contactElement.dataset.source = source;
+    
+    // Add a class to differentiate regular contacts from other contacts
+    if (source === 'other contacts') {
+      contactElement.classList.add('other-contact');
+    }
     
     contactElement.innerHTML = `
       <div class="contact-name">${name}</div>
       ${organization ? `<div class="contact-org">${organization}</div>` : ''}
       ${primaryEmail ? `<div class="contact-email">${primaryEmail}</div>` : ''}
+      <div class="contact-source">${source}</div>
     `;
     
     contactElement.addEventListener('click', () => {
@@ -432,5 +452,41 @@ const handleFetchContacts = () => {
       contactsContainer.innerHTML = `<p class="error-state">Error fetching contacts: ${response?.error || 'Unknown error'}</p>`;
       updateStatus('ready');
     }
+  });
+};
+
+// Log stored contacts
+const logStoredContacts = () => {
+  console.log('[Popup] Logging contacts from storage');
+  chrome.storage.local.get('vesperContacts', (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Popup] Error retrieving contacts:', chrome.runtime.lastError);
+      return;
+    }
+    
+    const contacts = result.vesperContacts || [];
+    console.log(`[Popup] Found ${contacts.length} contacts in storage`);
+    
+    if (contacts.length === 0) {
+      console.log('[Popup] No contacts found in storage. Try fetching contacts first.');
+      return;
+    }
+    
+    // Extract and log email addresses
+    const emails = [];
+    contacts.forEach(contact => {
+      if (contact.emails && contact.emails.length > 0) {
+        contact.emails.forEach(emailObj => {
+          emails.push({
+            name: contact.name || 'Unknown',
+            email: emailObj.email,
+            primary: emailObj.primary || false
+          });
+        });
+      }
+    });
+    
+    console.log(`[Popup] Total email addresses: ${emails.length}`);
+    console.table(emails);
   });
 }; 

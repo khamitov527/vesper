@@ -4,8 +4,12 @@
  */
 
 // People API scope for reading contacts
-const PEOPLE_API_SCOPE = 'https://www.googleapis.com/auth/contacts.readonly';
-const PEOPLE_API_ENDPOINT = 'https://people.googleapis.com/v1/people/me/connections';
+const PEOPLE_API_SCOPE = [
+  'https://www.googleapis.com/auth/contacts.readonly',
+  'https://www.googleapis.com/auth/contacts.other.readonly'
+];
+const CONTACTS_ENDPOINT = 'https://people.googleapis.com/v1/people/me/connections';
+const OTHER_CONTACTS_ENDPOINT = 'https://people.googleapis.com/v1/otherContacts';
 
 /**
  * Initializes the People API
@@ -27,19 +31,72 @@ export const initPeopleAPI = async () => {
  */
 export const fetchContacts = async () => {
   try {
-    console.log('[PeopleAPI] Fetching contacts...');
+    console.log('[PeopleAPI] Fetching all contacts...');
     
     // Get the authentication token
     const token = await getAuthToken();
     
-    // Parameters for the People API request
+    // Fetch both regular contacts and other contacts
+    const mainContacts = await fetchContactsFromEndpoint(CONTACTS_ENDPOINT, 'regular contacts', token);
+    const otherContacts = await fetchContactsFromEndpoint(OTHER_CONTACTS_ENDPOINT, 'other contacts', token);
+    
+    // Combine both contact lists
+    const allContacts = [...mainContacts, ...otherContacts];
+    console.log(`[PeopleAPI] Combined total: ${allContacts.length} contacts (${mainContacts.length} regular + ${otherContacts.length} other)`);
+    
+    // Store contacts in chrome.storage.local
+    await storeContacts(allContacts);
+    
+    console.log(`[PeopleAPI] Successfully fetched and stored ${allContacts.length} contacts`);
+    return allContacts;
+  } catch (error) {
+    console.error('[PeopleAPI] Error fetching contacts:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches contacts from a specific API endpoint
+ * @param {string} endpoint - The API endpoint to fetch from
+ * @param {string} type - The type of contacts being fetched (for logging)
+ * @param {string} token - The auth token for API requests
+ * @returns {Promise<Array>} Array of contact objects
+ */
+const fetchContactsFromEndpoint = async (endpoint, type, token) => {
+  // Array to hold all contacts
+  let allContacts = [];
+  // Next page token for pagination
+  let nextPageToken = null;
+  // Total API calls counter
+  let apiCallCount = 0;
+  
+  // Fetch contacts page by page
+  do {
+    apiCallCount++;
+    console.log(`[PeopleAPI] Fetching ${type} page ${apiCallCount}${nextPageToken ? ' with page token' : ''}`);
+    
+    // Parameters for the People API request - use different parameters for different endpoints
     const params = new URLSearchParams({
-      personFields: 'names,emailAddresses',
       pageSize: 1000 // Maximum allowed by the API
     });
     
+    // The otherContacts endpoint uses readMask instead of personFields
+    if (endpoint.includes('otherContacts')) {
+      params.append('readMask', 'names,emailAddresses');
+    } else {
+      params.append('personFields', 'names,emailAddresses');
+      // Add sources parameters individually - don't combine with comma
+      params.append('sources', 'READ_SOURCE_TYPE_CONTACT');
+      params.append('sources', 'READ_SOURCE_TYPE_PROFILE');
+    }
+    
+    // Add page token if we have one
+    if (nextPageToken) {
+      params.append('pageToken', nextPageToken);
+    }
+    
     // Make the API request
-    const response = await fetch(`${PEOPLE_API_ENDPOINT}?${params.toString()}`, {
+    const response = await fetch(`${endpoint}?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -49,23 +106,44 @@ export const fetchContacts = async () => {
     
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`People API error: ${errorData.error?.message || response.statusText}`);
+      console.error(`[PeopleAPI] Error fetching ${type}:`, errorData);
+      throw new Error(`People API error for ${type}: ${errorData.error?.message || response.statusText}`);
     }
     
     const data = await response.json();
     
-    // Process and format the contacts
-    const contacts = processContactsData(data);
+    // Get the list of people from the appropriate property
+    // Regular contacts use 'connections', otherContacts uses 'otherContacts'
+    const peopleList = endpoint.includes('otherContacts') ? data.otherContacts : data.connections;
     
-    // Store contacts in chrome.storage.local
-    await storeContacts(contacts);
+    // Log the raw response data for debugging
+    console.log(`[PeopleAPI] ${type} page ${apiCallCount} response:`, {
+      endpointType: type,
+      totalItems: peopleList?.length || 0,
+      hasNextPage: !!data.nextPageToken
+    });
     
-    console.log(`[PeopleAPI] Successfully fetched and stored ${contacts.length} contacts`);
-    return contacts;
-  } catch (error) {
-    console.error('[PeopleAPI] Error fetching contacts:', error);
-    throw error;
-  }
+    if (!peopleList || peopleList.length === 0) {
+      console.log(`[PeopleAPI] No ${type} found in this page`);
+    } else {
+      // Process the connections in this page
+      const pageContacts = processContactsData(peopleList, type);
+      allContacts = allContacts.concat(pageContacts);
+      console.log(`[PeopleAPI] Processed ${pageContacts.length} ${type} with emails in page ${apiCallCount}, total so far: ${allContacts.length}`);
+    }
+    
+    // Get the next page token
+    nextPageToken = data.nextPageToken;
+    
+    // Safety check to avoid infinite loops
+    if (apiCallCount >= 10) {
+      console.warn(`[PeopleAPI] Reached maximum number of API calls (10) for ${type}, stopping pagination`);
+      break;
+    }
+  } while (nextPageToken);
+  
+  console.log(`[PeopleAPI] Fetched a total of ${allContacts.length} ${type} across ${apiCallCount} API calls`);
+  return allContacts;
 };
 
 /**
@@ -76,7 +154,10 @@ const getAuthToken = async () => {
   try {
     // Get the auth token using the client ID from the manifest
     return new Promise((resolve, reject) => {
-      chrome.identity.getAuthToken({ interactive: true }, (token) => {
+      chrome.identity.getAuthToken({ 
+        interactive: true,
+        scopes: PEOPLE_API_SCOPE
+      }, (token) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
         } else if (!token) {
@@ -94,15 +175,26 @@ const getAuthToken = async () => {
 
 /**
  * Processes the raw contacts data from the People API
- * @param {Object} data - Raw response from the People API
+ * @param {Array} peopleList - Raw list of people from the API
+ * @param {string} type - The type of contacts being processed (for logging)
  * @returns {Array} Processed array of contact objects
  */
-const processContactsData = (data) => {
-  if (!data.connections) {
+const processContactsData = (peopleList, type) => {
+  if (!peopleList || peopleList.length === 0) {
+    console.log(`[PeopleAPI] No ${type} found in API response`);
     return [];
   }
   
-  return data.connections
+  console.log(`[PeopleAPI] Processing ${peopleList.length} raw ${type}`);
+  
+  // Log how many contacts have emails vs. how many don't
+  const contactsWithEmail = peopleList.filter(person => person.emailAddresses && person.emailAddresses.length > 0).length;
+  const contactsWithoutEmail = peopleList.length - contactsWithEmail;
+  
+  console.log(`[PeopleAPI] ${type} breakdown: ${contactsWithEmail} with email, ${contactsWithoutEmail} without email`);
+  
+  // Process connections with emails
+  const processedContacts = peopleList
     .filter(person => person.emailAddresses && person.emailAddresses.length > 0)
     .map(person => {
       const name = person.names && person.names.length > 0 
@@ -116,11 +208,15 @@ const processContactsData = (data) => {
       }));
       
       return {
-        name,
+        name: name || 'Unknown',
         emails,
-        resourceName: person.resourceName
+        resourceName: person.resourceName,
+        source: type, // Add source for tracking where contact came from
       };
     });
+  
+  console.log(`[PeopleAPI] Successfully processed ${processedContacts.length} ${type} with email addresses`);
+  return processedContacts;
 };
 
 /**
