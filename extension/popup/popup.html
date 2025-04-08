@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vesper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="vesper-container">
+    <header>
+      <h1>Vesper</h1>
+      <p class="subtitle">Voice-controlled Gmail Assistant</p>
+    </header>
+    
+    <div class="control-panel">
+      <button id="start-voice" class="primary-button">
+        <span class="icon">🎤</span> Start Voice Input
+      </button>
+      <div id="status-indicator" class="inactive">Inactive</div>
+    </div>
+    
+    <div class="recognition-results">
+      <p>Transcription: <span id="transcription-text">None yet</span></p>
+    </div>
+    
+    <div class="contact-results">
+      <h2>Possible Contacts</h2>
+      <div id="contacts-container">
+        <!-- Contacts will be populated here by JS -->
+        <p class="empty-state">No contacts found yet</p>
+      </div>
+    </div>
+    
+    <div class="action-buttons">
+      <button id="confirm-button" class="action-button" disabled>Confirm</button>
+      <button id="cancel-button" class="action-button">Cancel</button>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 

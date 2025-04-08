@@ -1,0 +1,10 @@
+/* This is a placeholder for the icon.png file.
+   In an actual implementation, you would need to create or download a proper PNG icon file.
+   
+   For Chrome extensions, you should use icons in these sizes:
+   - 16x16
+   - 48x48
+   - 128x128
+   
+   The icon should represent the Vesper voice assistant concept.
+*/ 
