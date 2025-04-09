@@ -7,6 +7,8 @@
 import { formatTranscriptionText, extractContactInfo, saveAPIKey } from './scripts/openAI.js';
 // Import People API module
 import { fetchContacts, getStoredContacts, initPeopleAPI } from './scripts/peopleAPI.js';
+// Import Supabase client
+import { getAuthenticatedUser, signInWithGoogle, persistSession } from './scripts/supabaseClient.js';
 
 // Load environment variables from .env
 const loadEnvVariables = async () => {
@@ -61,6 +63,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Initialize the People API
   const peopleAPIInit = await initPeopleAPI();
   console.log('[Background] People API initialization result:', peopleAPIInit);
+  
+  // Check if the user is authenticated with Supabase
+  const { user } = await getAuthenticatedUser();
+  console.log('[Background] User authentication status:', user ? 'Authenticated' : 'Not authenticated');
   
   // Log stored contacts
   logStoredContacts();
@@ -123,6 +129,102 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ status: 'auth_initiated' });
       break;
     
+    case 'SUPABASE_SIGN_IN':
+      console.log('[Background] Processing SUPABASE_SIGN_IN message');
+      (async () => {
+        try {
+          const result = await signInWithGoogle();
+          sendResponse({ 
+            status: result.success ? 'success' : 'error',
+            message: result.success ? 'Sign in initiated' : result.error
+          });
+        } catch (error) {
+          console.error('[Background] Error initiating Supabase sign-in:', error);
+          sendResponse({ 
+            status: 'error', 
+            error: error.message,
+            message: 'Failed to initiate sign-in'
+          });
+        }
+      })();
+      return true; // Required to use the sendResponse asynchronously
+    
+    case 'AUTH_SUCCESS':
+      console.log('[Background] Processing AUTH_SUCCESS message');
+      // This is received from the auth-callback.html page
+      (async () => {
+        try {
+          // The session should already be stored by the callback page
+          // Notify any open popup about the successful authentication
+          chrome.runtime.sendMessage({ 
+            type: 'AUTH_STATUS_UPDATE', 
+            authenticated: true,
+            user: message.user
+          });
+          
+          // Set badge or state to indicate authenticated status
+          chrome.action.setBadgeText({ text: '✓' });
+          chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+          
+          console.log('[Background] Successfully authenticated user:', message.user);
+        } catch (error) {
+          console.error('[Background] Error processing auth success:', error);
+        }
+      })();
+      break;
+    
+    case 'CHECK_AUTH_STATUS':
+      console.log('[Background] Processing CHECK_AUTH_STATUS message');
+      (async () => {
+        try {
+          const { user, error } = await getAuthenticatedUser();
+          sendResponse({ 
+            status: user ? 'authenticated' : 'unauthenticated',
+            user: user,
+            error: error
+          });
+        } catch (error) {
+          console.error('[Background] Error checking auth status:', error);
+          sendResponse({ 
+            status: 'error', 
+            error: error.message,
+            message: 'Failed to check auth status'
+          });
+        }
+      })();
+      return true;
+      
+    case 'SIGN_OUT':
+      console.log('[Background] Processing SIGN_OUT message');
+      (async () => {
+        try {
+          const { signOut } = await import('./scripts/supabaseClient.js');
+          const result = await signOut();
+          
+          // Clear badge
+          chrome.action.setBadgeText({ text: '' });
+          
+          sendResponse({ 
+            status: result.success ? 'success' : 'error',
+            message: result.success ? 'Successfully signed out' : result.error
+          });
+          
+          // Notify any open popup about the sign out
+          chrome.runtime.sendMessage({ 
+            type: 'AUTH_STATUS_UPDATE', 
+            authenticated: false
+          });
+        } catch (error) {
+          console.error('[Background] Error signing out:', error);
+          sendResponse({ 
+            status: 'error', 
+            error: error.message,
+            message: 'Failed to sign out'
+          });
+        }
+      })();
+      return true;
+      
     case 'FETCH_CONTACTS':
       console.log('[Background] Processing FETCH_CONTACTS message');
       (async () => {

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vesper</title>
   <link rel="stylesheet" href="popup.css">
+  <!-- Add Supabase from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="vesper-container">
@@ -13,42 +15,63 @@
       <p class="subtitle">Voice-controlled Gmail Assistant</p>
     </header>
     
-    <div class="control-panel">
-      <button id="start-voice" class="primary-button">
-        <span class="icon">🎤</span> Start Voice Input
-      </button>
-      <button id="fetch-contacts" class="primary-button">
-        <span class="icon">📇</span> Fetch Contacts
-      </button>
-      <div id="status-indicator" class="inactive">Inactive</div>
-    </div>
-    
-    <div class="recognition-results">
-      <p>Transcription: <span id="transcription-text">None yet</span></p>
-    </div>
-    
-    <div class="recipient-info">
-      <h2>Recipient Information</h2>
-      <div id="recipient-container" class="debug-highlight">
-        <p class="empty-state">No recipient detected</p>
+    <!-- Authentication section - shown when not logged in -->
+    <div id="auth-section" class="auth-section">
+      <div class="auth-message">
+        <p>Please sign in to use Vesper</p>
       </div>
+      <button id="google-sign-in" class="auth-button">
+        <span class="icon">🔑</span> Sign in with Google
+      </button>
     </div>
     
-    <div class="contact-results">
-      <h2>Possible Contacts</h2>
-      <div id="contacts-container">
-        <!-- Contacts will be populated here by JS -->
-        <p class="empty-state">No contacts found yet</p>
+    <!-- Main app content - shown when logged in -->
+    <div id="app-content" class="app-content" style="display: none;">
+      <div class="control-panel">
+        <button id="start-voice" class="primary-button">
+          <span class="icon">🎤</span> Start Voice Input
+        </button>
+        <button id="fetch-contacts" class="primary-button">
+          <span class="icon">📇</span> Fetch Contacts
+        </button>
+        <div id="status-indicator" class="inactive">Inactive</div>
       </div>
-    </div>
-    
-    <div class="action-buttons">
-      <button id="confirm-button" class="action-button" disabled>Confirm</button>
-      <button id="cancel-button" class="action-button">Cancel</button>
-      <button id="debug-reset" class="action-button debug">Reset</button>
+      
+      <div class="recognition-results">
+        <p>Transcription: <span id="transcription-text">None yet</span></p>
+      </div>
+      
+      <div class="recipient-info">
+        <h2>Recipient Information</h2>
+        <div id="recipient-container" class="debug-highlight">
+          <p class="empty-state">No recipient detected</p>
+        </div>
+      </div>
+      
+      <div class="contact-results">
+        <h2>Possible Contacts</h2>
+        <div id="contacts-container">
+          <!-- Contacts will be populated here by JS -->
+          <p class="empty-state">No contacts found yet</p>
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button id="confirm-button" class="action-button" disabled>Confirm</button>
+        <button id="cancel-button" class="action-button">Cancel</button>
+        <button id="debug-reset" class="action-button debug">Reset</button>
+      </div>
+      
+      <!-- User profile section -->
+      <div class="user-profile">
+        <div id="user-info">
+          <span id="user-name"></span>
+          <button id="sign-out" class="text-button">Sign Out</button>
+        </div>
+      </div>
     </div>
   </div>
   
-  <script src="popup.js"></script>
+  <script src="popup.js" type="module"></script>
 </body>
 </html> 

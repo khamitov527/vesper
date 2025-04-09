@@ -1,0 +1,23 @@
+{
+  "name": "vesper",
+  "version": "1.0.0",
+  "description": "Vesper is a Chrome extension that provides voice control for Gmail, focusing on composing emails. It uses the Web Speech API for voice input and leverages OpenAI to extract contact information from natural language, then matches against your recent Gmail contacts.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khamitov527/vesper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/khamitov527/vesper/issues"
+  },
+  "homepage": "https://github.com/khamitov527/vesper#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  }
+}

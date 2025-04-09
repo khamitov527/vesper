@@ -327,4 +327,82 @@ h1 {
   color: #0066cc;
   margin-top: 2px;
   word-break: break-all;
+}
+
+/* Authentication Styles */
+.auth-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  gap: 16px;
+}
+
+.auth-message {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.auth-message p {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.auth-button {
+  background-color: white;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 240px;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.auth-button:hover {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.auth-button .icon {
+  margin-right: 8px;
+}
+
+/* User Profile Styles */
+.user-profile {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+#user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#user-name {
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.text-button {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.text-button:hover {
+  background-color: rgba(66, 133, 244, 0.08);
 } 

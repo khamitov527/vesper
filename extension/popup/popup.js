@@ -3,6 +3,9 @@
  * Handles UI interactions and communication with background script
  */
 
+// Import Supabase client module
+import { signInWithGoogle, getAuthenticatedUser } from '../scripts/supabaseClient.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   initializePopup();
 });
@@ -18,6 +21,8 @@ const initializePopup = () => {
   const fetchContactsButton = document.getElementById('fetch-contacts');
   const statusIndicator = document.getElementById('status-indicator');
   const transcriptionText = document.getElementById('transcription-text');
+  const googleSignInButton = document.getElementById('google-sign-in');
+  const signOutButton = document.getElementById('sign-out');
   
   console.log('[Popup] Setting up event listeners');
   
@@ -27,6 +32,8 @@ const initializePopup = () => {
   cancelButton.addEventListener('click', handleCancelSelection);
   debugResetButton.addEventListener('click', handleDebugReset);
   fetchContactsButton.addEventListener('click', handleFetchContacts);
+  googleSignInButton.addEventListener('click', handleGoogleSignIn);
+  signOutButton.addEventListener('click', handleSignOut);
   
   // Add listener for popup closing
   window.addEventListener('beforeunload', stopVoiceRecognition);
@@ -34,7 +41,80 @@ const initializePopup = () => {
   // Check auth status
   checkAuthStatus();
   
+  // Listen for auth status updates from background script
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'AUTH_STATUS_UPDATE') {
+      console.log('[Popup] Received auth status update:', message);
+      updateAuthUI(message.authenticated, message.user);
+    }
+  });
+  
   console.log('[Popup] Popup initialized');
+};
+
+// Handle authentication with Google
+const handleGoogleSignIn = () => {
+  console.log('[Popup] Google sign in button clicked');
+  
+  chrome.runtime.sendMessage({ type: 'SUPABASE_SIGN_IN' }, (response) => {
+    console.log('[Popup] Response to sign in request:', response);
+    
+    if (response.status === 'error') {
+      showAuthError(response.message);
+    }
+  });
+};
+
+// Handle sign out
+const handleSignOut = () => {
+  console.log('[Popup] Sign out button clicked');
+  
+  chrome.runtime.sendMessage({ type: 'SIGN_OUT' }, (response) => {
+    console.log('[Popup] Response to sign out request:', response);
+    
+    if (response.status === 'success') {
+      updateAuthUI(false);
+    } else {
+      showAuthError(response.message);
+    }
+  });
+};
+
+// Show authentication error
+const showAuthError = (message) => {
+  const authMessage = document.querySelector('.auth-message p');
+  authMessage.textContent = `Error: ${message}`;
+  authMessage.style.color = 'var(--error-color)';
+  
+  setTimeout(() => {
+    authMessage.textContent = 'Please sign in to use Vesper';
+    authMessage.style.color = 'var(--text-secondary)';
+  }, 5000);
+};
+
+// Update UI based on authentication status
+const updateAuthUI = (isAuthenticated, userData = null) => {
+  const authSection = document.getElementById('auth-section');
+  const appContent = document.getElementById('app-content');
+  const userName = document.getElementById('user-name');
+  
+  if (isAuthenticated && userData) {
+    // Hide auth section, show app content
+    authSection.style.display = 'none';
+    appContent.style.display = 'block';
+    
+    // Display user info
+    userName.textContent = userData.email || userData.user_metadata?.full_name || 'Authenticated User';
+    
+    console.log('[Popup] Authenticated as:', userData.email);
+  } else {
+    // Show auth section, hide app content
+    authSection.style.display = 'flex';
+    appContent.style.display = 'none';
+    userName.textContent = '';
+    
+    console.log('[Popup] User is not authenticated');
+  }
 };
 
 // Handle voice input start
@@ -238,14 +318,17 @@ const displayContacts = (contacts) => {
   });
 };
 
-// Check if user is authenticated
+// Check authentication status
 const checkAuthStatus = () => {
-  chrome.runtime.sendMessage({ type: 'CHECK_AUTH' }, (response) => {
-    if (!response || !response.authenticated) {
-      // TODO: Handle not authenticated state
-      console.log('[Popup] User not authenticated');
+  console.log('[Popup] Checking authentication status');
+  
+  chrome.runtime.sendMessage({ type: 'CHECK_AUTH_STATUS' }, (response) => {
+    console.log('[Popup] Auth status response:', response);
+    
+    if (response.status === 'authenticated' && response.user) {
+      updateAuthUI(true, response.user);
     } else {
-      console.log('[Popup] User is authenticated');
+      updateAuthUI(false);
     }
   });
 };
